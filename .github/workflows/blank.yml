@@ -38,13 +38,6 @@ jobs:
 
       - name: Build APK
         run: |
-          buildozer init
-          echo "[app]" >> buildozer.spec
-          echo "title = MiApp" >> buildozer.spec
-          echo "package.name = miapp" >> buildozer.spec
-          echo "package.domain = org.miapp" >> buildozer.spec
-          echo "requirements = python3, kivy==2.0.0, kivymd==0.104.2" >> buildozer.spec
-          echo "android.permissions = INTERNET" >> buildozer.spec
           buildozer -v android debug
 
       - name: Upload APK
