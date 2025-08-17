@@ -14,26 +14,31 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
-          sudo apt-get update || true
-          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev || true
-          pip install buildozer cython
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk \
+          autoconf libtool pkg-config zlib1g-dev libncurses5-dev \
+          libncursesw5-dev cmake libffi-dev libssl-dev
+
+      - name: Install Python tools
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install buildozer==1.5.0 cython
+
+      - name: Prepare environment
+        run: |
+          mkdir -p ~/.buildozer/android/platform
+          echo "[buildozer]\nlog_level = 2" > ~/.buildozerrc
 
       - name: Build APK
         run: |
           buildozer init
-          echo "[app]" >> buildozer.spec
-          echo "title = MiApp" >> buildozer.spec
-          echo "package.name = miapp" >> buildozer.spec
-          echo "package.domain = org.miapp" >> buildozer.spec
-          echo "requirements = python3, kivy==2.0.0, kivymd==0.104.2" >> buildozer.spec
-          echo "android.permissions = INTERNET" >> buildozer.spec
-          buildozer -v android debug > buildozer.log 2>&1
+          buildozer -v android debug 2>&1 | tee buildozer.log
           cat buildozer.log
 
       - name: Upload APK
-        if: success()  # Solo sube si el paso anterior tuvo éxito
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: kivy-apk
