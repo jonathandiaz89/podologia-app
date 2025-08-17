@@ -1,3 +1,38 @@
-git add .
-git commit -m "Add GitHub Actions for APK build"
-git push origin main
+name: Build Kivy APK
+
+on: [push]  # Se ejecuta al hacer git push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev
+          pip install buildozer
+
+      - name: Build APK
+        run: |
+          buildozer init
+          echo "[app]" >> buildozer.spec
+          echo "title = MiApp" >> buildozer.spec
+          echo "package.name = miapp" >> buildozer.spec
+          echo "package.domain = org.miapp" >> buildozer.spec
+          echo "requirements = python3, kivy==2.0.0, kivymd==0.104.2" >> buildozer.spec
+          echo "android.permissions = INTERNET" >> buildozer.spec
+          buildozer -v android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: kivy-apk
+          path: bin/*.apk
