@@ -13,20 +13,22 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build with official Kivy image
+      - name: Build with Ubuntu and manual setup
         run: |
-          # Usar la imagen OFICIAL de Kivy (garantizada que existe)
-          docker run --rm -v $(pwd):/app \
-            -e FIREBASE_PRIVATE_KEY_ID="$FIREBASE_PRIVATE_KEY_ID" \
-            -e FIREBASE_PRIVATE_KEY="$FIREBASE_PRIVATE_KEY" \
-            -e FIREBASE_CLIENT_EMAIL="$FIREBASE_CLIENT_EMAIL" \
-            -e FIREBASE_CLIENT_ID="$FIREBASE_CLIENT_ID" \
-            kivy/buildozer:latest buildozer -v android debug
-        env:
-          FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
+          # Usar Ubuntu base y hacer TODO manualmente
+          docker run --rm -v $(pwd):/app ubuntu:22.04 /bin/bash -c "
+          # Actualizar e instalar dependencias
+          apt-get update && apt-get install -y \
+              git zip unzip python3-pip autoconf libtool pkg-config \
+              zlib1g-dev libncurses5-dev libncursesw5-dev libffi-dev \
+              libssl-dev cython3 openjdk-17-jdk curl wget unzip
+    
+          # Instalar Buildozer
+          pip install buildozer
+    
+          # Configurar Buildozer para usar SDK existente (si lo tienes)
+          cd /app && buildozer -v android debug
+          "
 
       - name: Upload APK
         if: success()
