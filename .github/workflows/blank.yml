@@ -38,24 +38,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Verificar si buildozer.spec ya existe
-          if [ -f buildozer.spec ]; then
-            echo "buildozer.spec ya existe, usando el existente"
-          else
-            buildozer init
-            echo "[app]" >> buildozer.spec
-            echo "title = PodologiaApp" >> buildozer.spec
-            echo "package.name = podologiaapp" >> buildozer.spec
-            echo "package.domain = org.podologia" >> buildozer.spec
-            echo "requirements = python3, kivy==2.0.0, kivymd==0.104.2, firebase-admin==6.0.0, python-dateutil>=2.8.0, unidecode==1.3.6" >> buildozer.spec
-            echo "android.permissions = INTERNET" >> buildozer.spec
-          fi
-          
-          # Construir la APK
+          # Usar el buildozer.spec existente sin modificarlo
           buildozer -v android debug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: kivy-apk
           path: bin/*.apk
