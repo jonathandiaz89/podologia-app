@@ -36,31 +36,46 @@ jobs:
           mkdir cmdline-tools
           mv latest cmdline-tools/
           
+          # Configurar variables de entorno
           export ANDROID_SDK_ROOT=~/android-sdk
           export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653
           export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/33.0.0
           
-          # Aceptar licencias e instalar componentes
+          # Aceptar licencias e instalar componentes COMPLETOS
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "cmdline-tools;latest" "ndk;25.2.9519653"
-          sdkmanager "build-tools;33.0.0"
-          sdkmanager "platforms;android-33"
-          sdkmanager "cmdline-tools;latest"
           
+          # VERIFICAR que Aidl está instalado y es ejecutable
+          ls -la $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl*
+          chmod +x $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl
+          $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl --version
+          
+          # Configurar variables de entorno para todos los pasos siguientes
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+          echo "PATH=$PATH:$ANDROID_SDK_ROOT/build-tools/33.0.0" >> $GITHUB_ENV
 
       - name: Install Python dependencies
         run: |
           pip install buildozer cython
 
+      - name: Verify Android tools
+        run: |
+          echo "=== VERIFICACIÓN DE HERRAMIENTAS ANDROID ==="
+          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+          echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+          echo "PATH: $PATH"
+          which aidl || echo "Aidl no encontrado en PATH"
+          ls -la $ANDROID_SDK_ROOT/build-tools/33.0.0/ | grep aidl
+          $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl --version || echo "Aidl no ejecutable"
+          which aapt || echo "Aapt no encontrado"
+          which zipalign || echo "Zipalign no encontrado"
+
       - name: Create buildozer.spec from template
         run: |
-          # Verificar que el template existe, si no crearlo
           if [ ! -f buildozer.spec.template ]; then
             echo "📋 Creando buildozer.spec.template..."
             
-            # Crear template usando múltiples echos
             echo "[app]" > buildozer.spec.template
             echo "title = PodologiaApp" >> buildozer.spec.template
             echo "package.name = podologiaapp" >> buildozer.spec.template
@@ -84,25 +99,14 @@ jobs:
             echo "source.dir = ." >> buildozer.spec.template
             echo "main.py = main.py" >> buildozer.spec.template
             echo "data.dir = assets" >> buildozer.spec.template
-            
-            echo "✅ Template creado exitosamente"
-          else
-            echo "✅ Template ya existe"
           fi
           
-          # Copiar template a buildozer.spec
           cp buildozer.spec.template buildozer.spec
-          
-          # Reemplazar placeholders con secrets
           sed -i "s/__FIREBASE_PRIVATE_KEY_ID__/$FIREBASE_PRIVATE_KEY_ID/g" buildozer.spec
           sed -i "s/__FIREBASE_PRIVATE_KEY__/$FIREBASE_PRIVATE_KEY/g" buildozer.spec
           sed -i "s/__FIREBASE_CLIENT_EMAIL__/$FIREBASE_CLIENT_EMAIL/g" buildozer.spec
           sed -i "s/__FIREBASE_CLIENT_ID__/$FIREBASE_CLIENT_ID/g" buildozer.spec
-          
-          # Escapar saltos de línea en la private key
           sed -i 's/\\n/\\\\n/g' buildozer.spec
-          
-          echo "✅ buildozer.spec configurado con las credenciales"
         env:
           FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
@@ -111,6 +115,10 @@ jobs:
 
       - name: Build APK
         run: |
+          # Configurar PATH explícitamente para Buildozer
+          export PATH=$PATH:$ANDROID_SDK_ROOT/build-tools/33.0.0
+          echo "PATH final: $PATH"
+          which aidl
           buildozer -v android debug
 
       - name: Upload APK
