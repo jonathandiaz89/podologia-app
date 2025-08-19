@@ -38,11 +38,21 @@ jobs:
 
       - name: Build APK
         run: |
-          # Usar el buildozer.spec existente sin modificarlo
+          # Reemplazar variables en buildozer.spec
+          sed -i "s|\${{ secrets.FIREBASE_PRIVATE_KEY_ID }}|$FIREBASE_PRIVATE_KEY_ID|g" buildozer.spec
+          sed -i "s|\${{ secrets.FIREBASE_PRIVATE_KEY }}|$FIREBASE_PRIVATE_KEY|g" buildozer.spec
+          sed -i "s|\${{ secrets.FIREBASE_CLIENT_EMAIL }}|$FIREBASE_CLIENT_EMAIL|g" buildozer.spec
+          sed -i "s|\${{ secrets.FIREBASE_CLIENT_ID }}|$FIREBASE_CLIENT_ID|g" buildozer.spec
+    
           buildozer -v android debug
+        env:
+          FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
 
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kivy-apk
           path: bin/*.apk
