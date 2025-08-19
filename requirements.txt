@@ -1,0 +1,7 @@
+kivy==2.0.0
+kivymd==0.104.2
+firebase-admin==6.0.0
+python-dateutil>=2.8.0
+unidecode==1.3.6
+kivy-garden==0.1.4
+pyjnius==1.4.2
