@@ -13,21 +13,51 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build with Buildozer Docker image
+      - name: Build with custom Docker image
         run: |
-          # Usar imagen de Buildozer con todo preinstalado
-          docker run --rm -v $(pwd):/app \
+         # Crear un Dockerfile temporal con todo lo necesario
+         cat > Dockerfile << 'EOL'
+         FROM ubuntu:22.04
+    
+         # Instalar todas las dependencias
+         RUN apt-get update && apt-get install -y \
+             git zip unzip python3-pip autoconf libtool pkg-config \
+             zlib1g-dev libncurses5-dev libncursesw5-dev libffi-dev \
+             libssl-dev cython3 openjdk-17-jdk curl
+    
+         # Instalar Android SDK
+         RUN mkdir -p /android-sdk && cd /android-sdk && \
+             curl -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip && \
+             unzip cmdline-tools.zip && rm cmdline-tools.zip && \
+             mv cmdline-tools latest && mkdir -p cmdline-tools && mv latest cmdline-tools/ && \
+             yes | cmdline-tools/latest/bin/sdkmanager --licenses && \
+             cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;33.0.0" "platforms;android-33" "ndk;25.2.9519653"
+    
+         # Instalar Buildozer
+         RUN pip install buildozer cython
+    
+         # Configurar entorno
+         ENV ANDROID_SDK_ROOT=/android-sdk
+         ENV ANDROID_NDK_HOME=/android-sdk/ndk/25.2.9519653
+         ENV PATH="$PATH:/android-sdk/cmdline-tools/latest/bin:/android-sdk/platform-tools:/android-sdk/build-tools/33.0.0"
+    
+         WORKDIR /app
+         EOL
+
+         # Construir y ejecutar
+         docker build -t kivy-builder .
+         docker run --rm -v $(pwd):/app \
             -e FIREBASE_PRIVATE_KEY_ID="$FIREBASE_PRIVATE_KEY_ID" \
             -e FIREBASE_PRIVATE_KEY="$FIREBASE_PRIVATE_KEY" \
             -e FIREBASE_CLIENT_EMAIL="$FIREBASE_CLIENT_EMAIL" \
             -e FIREBASE_CLIENT_ID="$FIREBASE_CLIENT_ID" \
-            kivy/buildozer:latest buildozer -v android debug
-        env:
-          FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
-
+            kivy-builder buildozer -v android debug
+         env:
+            FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
+            FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+            FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+            FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
+      
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
