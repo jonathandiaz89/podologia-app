@@ -13,33 +13,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build with pre-built Android image
+      - name: Build with official Kivy image
         run: |
-          # Usar imagen Docker con TODO preinstalado (solución definitiva)
+          # Usar la imagen OFICIAL de Kivy (garantizada que existe)
           docker run --rm -v $(pwd):/app \
             -e FIREBASE_PRIVATE_KEY_ID="$FIREBASE_PRIVATE_KEY_ID" \
             -e FIREBASE_PRIVATE_KEY="$FIREBASE_PRIVATE_KEY" \
             -e FIREBASE_CLIENT_EMAIL="$FIREBASE_CLIENT_EMAIL" \
             -e FIREBASE_CLIENT_ID="$FIREBASE_CLIENT_ID" \
-            beevelop/android:33 /bin/bash -c "
-            # Configurar entorno
-            export ANDROID_SDK_ROOT=/opt/android-sdk
-            export ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653
-            export PATH=\$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/build-tools/33.0.0
-            
-            # Verificar que Aidl existe
-            echo '=== VERIFICANDO HERRAMIENTAS ANDROID ==='
-            which aidl && aidl --version || echo 'Aidl no encontrado'
-            which aapt && aapt version || echo 'Aapt no encontrado'
-            ls -la /opt/android-sdk/build-tools/33.0.0/ | head -10
-            
-            # Instalar Python y Buildozer
-            apt-get update && apt-get install -y python3-pip cython3
-            pip install buildozer
-            
-            # Ejecutar Buildozer
-            cd /app && buildozer -v android debug
-            "
+            kivy/buildozer:latest buildozer -v android debug
         env:
           FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
