@@ -32,8 +32,10 @@ jobs:
           
           # Aceptar licencias
           yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
-          
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "cmdline-tools;latest"
+
+          $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl --version
+
           pip install buildozer cython
 
       - name: Create buildozer.spec from template
