@@ -13,75 +13,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build with custom Docker image
+      - name: Build with pre-built Android image
         run: |
-          # Crear un Dockerfile temporal con instalación robusta
-          cat > Dockerfile << 'EOL'
-          FROM ubuntu:22.04
-          
-          # Instalar todas las dependencias de forma no interactiva
-          RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-              git zip unzip python3-pip autoconf libtool pkg-config \
-              zlib1g-dev libncurses5-dev libncursesw5-dev libffi-dev \
-              libssl-dev cython3 openjdk-17-jdk curl wget unzip
-          
-          # Instalar Android SDK de forma robusta
-          RUN mkdir -p /android-sdk && cd /android-sdk && \
-              wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip && \
-              unzip -q commandlinetools-linux-9477386_latest.zip && \
-              rm commandlinetools-linux-9477386_latest.zip && \
-              mv cmdline-tools latest && \
-              mkdir -p cmdline-tools && \
-              mv latest cmdline-tools/
-          
-          # Configurar variables de entorno
-          ENV ANDROID_SDK_ROOT=/android-sdk
-          ENV PATH="$PATH:/android-sdk/cmdline-tools/latest/bin"
-          
-          # Crear archivo de configuración para evitar prompts
-          RUN mkdir -p /root/.android && \
-              touch /root/.android/repositories.cfg
-          
-          # Aceptar licencias manualmente (solución definitiva)
-          RUN echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > /root/.android/androidtool.cert && \
-              echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> /root/.android/androidtool.cert && \
-              echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> /root/.android/androidtool.cert
-          
-          # Instalar componentes Android INDIVIDUALMENTE
-          RUN /android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/android-sdk "platform-tools"
-          RUN /android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/android-sdk "build-tools;33.0.0"
-          RUN /android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/android-sdk "platforms;android-33"
-          RUN /android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/android-sdk "ndk;25.2.9519653"
-          
-          # Verificar que Aidl está instalado
-          RUN if [ -f "/android-sdk/build-tools/33.0.0/aidl" ]; then \
-              chmod +x /android-sdk/build-tools/33.0.0/aidl && \
-              echo "✅ Aidl instalado correctamente"; \
-            else \
-              echo "❌ Aidl no encontrado, buscando..."; \
-              find /android-sdk -name "aidl" -type f; \
-              exit 1; \
-            fi
-          
-          # Configurar PATH final
-          ENV PATH="$PATH:/android-sdk/platform-tools:/android-sdk/build-tools/33.0.0"
-          
-          # Instalar Buildozer
-          RUN pip install buildozer cython
-          
-          WORKDIR /app
-          EOL
-
-          # Construir la imagen Docker
-          docker build -t kivy-builder .
-          
-          # Ejecutar Buildozer
+          # Usar imagen Docker con TODO preinstalado (solución definitiva)
           docker run --rm -v $(pwd):/app \
             -e FIREBASE_PRIVATE_KEY_ID="$FIREBASE_PRIVATE_KEY_ID" \
             -e FIREBASE_PRIVATE_KEY="$FIREBASE_PRIVATE_KEY" \
             -e FIREBASE_CLIENT_EMAIL="$FIREBASE_CLIENT_EMAIL" \
             -e FIREBASE_CLIENT_ID="$FIREBASE_CLIENT_ID" \
-            kivy-builder buildozer -v android debug
+            beevelop/android:33 /bin/bash -c "
+            # Configurar entorno
+            export ANDROID_SDK_ROOT=/opt/android-sdk
+            export ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653
+            export PATH=\$PATH:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/build-tools/33.0.0
+            
+            # Verificar que Aidl existe
+            echo '=== VERIFICANDO HERRAMIENTAS ANDROID ==='
+            which aidl && aidl --version || echo 'Aidl no encontrado'
+            which aapt && aapt version || echo 'Aapt no encontrado'
+            ls -la /opt/android-sdk/build-tools/33.0.0/ | head -10
+            
+            # Instalar Python y Buildozer
+            apt-get update && apt-get install -y python3-pip cython3
+            pip install buildozer
+            
+            # Ejecutar Buildozer
+            cd /app && buildozer -v android debug
+            "
         env:
           FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
