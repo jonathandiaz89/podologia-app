@@ -31,6 +31,15 @@ jobs:
             ndk;25.2.9519653
             cmdline-tools;latest
 
+      - name: Build using Docker
+        run: |
+           docker run --rm -v $(pwd):/app \
+           -e FIREBASE_PRIVATE_KEY_ID="$FIREBASE_PRIVATE_KEY_ID" \
+           -e FIREBASE_PRIVATE_KEY="$FIREBASE_PRIVATE_KEY" \
+           -e FIREBASE_CLIENT_EMAIL="$FIREBASE_CLIENT_EMAIL" \
+           -e FIREBASE_CLIENT_ID="$FIREBASE_CLIENT_ID" \
+           kivy/buildozer:latest buildozer -v android debug
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
