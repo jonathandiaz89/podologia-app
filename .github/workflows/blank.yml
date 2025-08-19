@@ -36,9 +36,42 @@ jobs:
           
           pip install buildozer
 
-      - name: Setup buildozer.spec with secrets
+      - name: Create buildozer.spec from template
         run: |
-          # Copiar template
+          # Verificar que el template existe
+          if [ ! -f buildozer.spec.template ]; then
+            echo "❌ Error: buildozer.spec.template no encontrado"
+            echo "📋 Creando template básico..."
+            
+            # Crear template básico si no existe
+            cat > buildozer.spec.template << 'EOL'
+[app]
+title = PodologiaApp
+package.name = podologiaapp
+package.domain = org.podologia
+version = 0.1
+requirements = python3,kivy==2.0.0,kivymd==0.104.2,firebase-admin==6.0.0,python-dateutil,unidecode==1.3.6,pyjnius
+android.permissions = INTERNET,CAMERA,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+android.envvars = 
+    FIREBASE_TYPE=service_account
+    FIREBASE_PROJECT_ID=podologia-app
+    FIREBASE_PRIVATE_KEY_ID=__FIREBASE_PRIVATE_KEY_ID__
+    FIREBASE_PRIVATE_KEY=__FIREBASE_PRIVATE_KEY__
+    FIREBASE_CLIENT_EMAIL=__FIREBASE_CLIENT_EMAIL__
+    FIREBASE_CLIENT_ID=__FIREBASE_CLIENT_ID__
+    FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
+    FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token
+    FIREBASE_AUTH_PROVIDER_CERT_URL=https://www.googleapis.com/oauth2/v1/certs
+    FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40podologia-app.iam.gserviceaccount.com
+orientation = portrait
+source.include_exts = py,png,jpg,kv,atlas,json
+source.dir = .
+main.py = main.py
+data.dir = assets
+EOL
+          fi
+          
+          # Copiar template a buildozer.spec
           cp buildozer.spec.template buildozer.spec
           
           # Reemplazar placeholders con secrets
@@ -49,6 +82,8 @@ jobs:
           
           # Escapar saltos de línea en la private key
           sed -i 's/\\n/\\\\n/g' buildozer.spec
+          
+          echo "✅ buildozer.spec creado exitosamente"
         env:
           FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
@@ -60,7 +95,7 @@ jobs:
           buildozer -v android debug
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: kivy-apk
           path: bin/*.apk
