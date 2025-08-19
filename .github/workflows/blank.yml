@@ -5,6 +5,10 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+       ANDROID_SDK_ROOT: /home/runner/android-sdk
+       ANDROID_NDK_HOME: /home/runner/android-sdk/ndk/25.2.9519653
+       
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,80 +29,91 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev libltdl-dev cython3
 
-      - name: Set up Android SDK
+      - name: Install Android SDK and ndk
         run: |
-          # Instalar Android SDK
+          # Crear directorios
           mkdir -p ~/android-sdk
           cd ~/android-sdk
-          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip commandlinetools-linux-9477386_latest.zip
+          
+          # Descargar e instalar command line tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip
           mv cmdline-tools latest
-          mkdir cmdline-tools
+          mkdir -p cmdline-tools
           mv latest cmdline-tools/
           
-          # Configurar variables de entorno
-          export ANDROID_SDK_ROOT=~/android-sdk
-          export ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/25.2.9519653
-          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/33.0.0
+          # Configurar PATH
+          export PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin:~/android-sdk/platform-tools:~/android-sdk/build-tools/33.0.0
           
-          # Aceptar licencias e instalar componentes COMPLETOS
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "cmdline-tools;latest" "ndk;25.2.9519653"
+          # Aceptar licencias
+          yes | sdkmanager --licenses > /dev/null 2>&1
           
-          # VERIFICAR que Aidl está instalado y es ejecutable
-          ls -la $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl*
-          chmod +x $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl
-          $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl --version
+          # Instalar componentes ESSENCIALES
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
           
-          # Configurar variables de entorno para todos los pasos siguientes
+          # Instalar NDK ESPECÍFICO que necesita Buildozer
+          sdkmanager "ndk;25.2.9519653" --channel=3
+          
+          # Verificar instalación
+          echo "=== VERIFICACIÓN ANDROID ==="
+          ls -la ~/android-sdk/ndk/
+          ls -la ~/android-sdk/ndk/25.2.9519653/
+          echo "NDK path: $ANDROID_NDK_HOME"
+
+      - name: Set up environment variables
+        run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-          echo "PATH=$PATH:$ANDROID_SDK_ROOT/build-tools/33.0.0" >> $GITHUB_ENV
+          echo "PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/33.0.0" >> $GITHUB_ENV
 
       - name: Install Python dependencies
         run: |
           pip install buildozer cython
 
-      - name: Verify Android tools
+      - name: Verify Android and NDK installation
         run: |
-          echo "=== VERIFICACIÓN DE HERRAMIENTAS ANDROID ==="
+          echo "=== VERIFICACIÓN COMPLETA ==="
           echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
           echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
-          echo "PATH: $PATH"
-          which aidl || echo "Aidl no encontrado en PATH"
-          ls -la $ANDROID_SDK_ROOT/build-tools/33.0.0/ | grep aidl
-          $ANDROID_SDK_ROOT/build-tools/33.0.0/aidl --version || echo "Aidl no ejecutable"
-          which aapt || echo "Aapt no encontrado"
-          which zipalign || echo "Zipalign no encontrado"
+          echo "Java version:"
+          java -version
+          echo "Python version:"
+          python --version
+          echo "NDK contents:"
+          ls -la $ANDROID_NDK_HOME/ || echo "NDK no encontrado"
+          echo "Build tools:"
+          ls -la $ANDROID_SDK_ROOT/build-tools/33.0.0/ | head -10
 
       - name: Create buildozer.spec from template
         run: |
           if [ ! -f buildozer.spec.template ]; then
             echo "📋 Creando buildozer.spec.template..."
             
-            echo "[app]" > buildozer.spec.template
-            echo "title = PodologiaApp" >> buildozer.spec.template
-            echo "package.name = podologiaapp" >> buildozer.spec.template
-            echo "package.domain = org.podologia" >> buildozer.spec.template
-            echo "version = 0.1" >> buildozer.spec.template
-            echo "requirements = python3,kivy==2.0.0,kivymd==0.104.2,firebase-admin==6.0.0,python-dateutil,unidecode==1.3.6,pyjnius,cython" >> buildozer.spec.template
-            echo "android.permissions = INTERNET,CAMERA,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE" >> buildozer.spec.template
-            echo "android.envvars = " >> buildozer.spec.template
-            echo "    FIREBASE_TYPE=service_account" >> buildozer.spec.template
-            echo "    FIREBASE_PROJECT_ID=podologia-app" >> buildozer.spec.template
-            echo "    FIREBASE_PRIVATE_KEY_ID=__FIREBASE_PRIVATE_KEY_ID__" >> buildozer.spec.template
-            echo "    FIREBASE_PRIVATE_KEY=__FIREBASE_PRIVATE_KEY__" >> buildozer.spec.template
-            echo "    FIREBASE_CLIENT_EMAIL=__FIREBASE_CLIENT_EMAIL__" >> buildozer.spec.template
-            echo "    FIREBASE_CLIENT_ID=__FIREBASE_CLIENT_ID__" >> buildozer.spec.template
-            echo "    FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth" >> buildozer.spec.template
-            echo "    FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token" >> buildozer.spec.template
-            echo "    FIREBASE_AUTH_PROVIDER_CERT_URL=https://www.googleapis.com/oauth2/v1/certs" >> buildozer.spec.template
-            echo "    FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40podologia-app.iam.gserviceaccount.com" >> buildozer.spec.template
-            echo "orientation = portrait" >> buildozer.spec.template
-            echo "source.include_exts = py,png,jpg,kv,atlas,json" >> buildozer.spec.template
-            echo "source.dir = ." >> buildozer.spec.template
-            echo "main.py = main.py" >> buildozer.spec.template
-            echo "data.dir = assets" >> buildozer.spec.template
+            cat > buildozer.spec.template << 'EOL'
+[app]
+title = PodologiaApp
+package.name = podologiaapp
+package.domain = org.podologia
+version = 0.1
+requirements = python3,kivy==2.0.0,kivymd==0.104.2,firebase-admin==6.0.0,python-dateutil,unidecode==1.3.6,pyjnius,cython
+android.permissions = INTERNET,CAMERA,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+android.envvars = 
+    FIREBASE_TYPE=service_account
+    FIREBASE_PROJECT_ID=podologia-app
+    FIREBASE_PRIVATE_KEY_ID=__FIREBASE_PRIVATE_KEY_ID__
+    FIREBASE_PRIVATE_KEY=__FIREBASE_PRIVATE_KEY__
+    FIREBASE_CLIENT_EMAIL=__FIREBASE_CLIENT_EMAIL__
+    FIREBASE_CLIENT_ID=__FIREBASE_CLIENT_ID__
+    FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
+    FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token
+    FIREBASE_AUTH_PROVIDER_CERT_URL=https://www.googleapis.com/oauth2/v1/certs
+    FIREBASE_CLIENT_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40podologia-app.iam.gserviceaccount.com
+orientation = portrait
+source.include_exts = py,png,jpg,kv,atlas,json
+source.dir = .
+main.py = main.py
+data.dir = assets
+EOL
           fi
           
           cp buildozer.spec.template buildozer.spec
@@ -113,16 +128,39 @@ jobs:
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
 
-      - name: Build APK
+      - name: Build APK with debug info
         run: |
-          # Configurar PATH explícitamente para Buildozer
-          export PATH=$PATH:$ANDROID_SDK_ROOT/build-tools/33.0.0
-          echo "PATH final: $PATH"
-          which aidl
+          echo "=== BUILD ENVIRONMENT ==="
+          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+          echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+          echo "PATH: $PATH"
+          
+          # Verificar que el NDK existe
+          if [ -d "$ANDROID_NDK_HOME" ]; then
+            echo "✅ NDK encontrado en: $ANDROID_NDK_HOME"
+            ls -la $ANDROID_NDK_HOME/
+          else
+            echo "❌ NDK NO encontrado en: $ANDROID_NDK_HOME"
+            echo "Buscando NDK en otras ubicaciones..."
+            find ~/android-sdk -name "ndk" -type d 2>/dev/null || echo "No se encontró NDK"
+            exit 1
+          fi
+          
+          # Ejecutar buildozer con verbose
           buildozer -v android debug
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: kivy-apk
           path: bin/*.apk
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            .buildozer
+            buildozer.spec
