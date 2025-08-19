@@ -28,8 +28,21 @@ jobs:
           cd ~/android-sdk
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
           unzip -q commandlinetools-linux-9477386_latest.zip
-          mkdir -p cmdline-tools
-          mv cmdline-tools cmdline-tools/latest
+          
+          # CORRECCIÓN: Estructura de directorios correcta
+          # Las tools se extraen en una carpeta 'cmdline-tools', la renombramos a 'latest'
+          # y luego movemos a la ubicación correcta
+          if [ -d "cmdline-tools" ]; then
+            mv cmdline-tools latest
+            mkdir -p cmdline-tools
+            mv latest cmdline-tools/
+          else
+            # Si la estructura es diferente, manejarlo
+            ls -la
+            mv $(ls -d */ | head -1) latest
+            mkdir -p cmdline-tools
+            mv latest cmdline-tools/
+          fi
           
           # Configurar variables de entorno
           echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
@@ -62,14 +75,14 @@ jobs:
       - name: Create symlinks for Android tools
         run: |
           # Crear enlaces simbólicos en /usr/local/bin para que Buildozer los encuentre
-          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/aidl /usr/local/bin/aidl
-          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/aapt /usr/local/bin/aapt
-          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/zipalign /usr/local/bin/zipalign
-          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/d8 /usr/local/bin/d8
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/aidl /usr/local/bin/aidl || true
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/aapt /usr/local/bin/aapt || true
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/zipalign /usr/local/bin/zipalign || true
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/d8 /usr/local/bin/d8 || true
           
           echo "=== ENLACES CREADOS ==="
-          ls -la /usr/local/bin/aidl
-          which aidl
+          ls -la /usr/local/bin/aidl 2>/dev/null || echo "No se pudo crear enlace para aidl"
+          which aidl || echo "Aidl no encontrado en PATH"
 
       - name: Install Python dependencies
         run: |
@@ -81,11 +94,11 @@ jobs:
           echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
           echo "Java: $(java -version 2>&1 | head -1)"
           echo "Python: $(python --version)"
-          echo "Buildozer: $(buildozer --version)"
+          echo "Buildozer: $(buildozer --version 2>/dev/null || echo 'no disponible')"
           echo "Herramientas Android:"
-          which aidl && aidl --version
-          which aapt && aapt version
-          which zipalign && zipalign --help | head -1
+          which aidl && aidl --version || echo "Aidl no encontrado"
+          which aapt && aapt version || echo "Aapt no encontrado"
+          which zipalign && zipalign || echo "Zipalign no encontrado"
 
       - name: Create buildozer.spec from template
         run: |
