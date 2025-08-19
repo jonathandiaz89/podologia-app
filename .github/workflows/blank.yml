@@ -36,20 +36,28 @@ jobs:
           
           pip install buildozer
 
-      - name: Build APK
+      - name: Setup buildozer.spec with secrets
         run: |
-          # Reemplazar variables en buildozer.spec
-          sed -i "s|\${{ secrets.FIREBASE_PRIVATE_KEY_ID }}|$FIREBASE_PRIVATE_KEY_ID|g" buildozer.spec
-          sed -i "s|\${{ secrets.FIREBASE_PRIVATE_KEY }}|$FIREBASE_PRIVATE_KEY|g" buildozer.spec
-          sed -i "s|\${{ secrets.FIREBASE_CLIENT_EMAIL }}|$FIREBASE_CLIENT_EMAIL|g" buildozer.spec
-          sed -i "s|\${{ secrets.FIREBASE_CLIENT_ID }}|$FIREBASE_CLIENT_ID|g" buildozer.spec
-    
-          buildozer -v android debug
+          # Copiar template
+          cp buildozer.spec.template buildozer.spec
+          
+          # Reemplazar placeholders con secrets
+          sed -i "s/__FIREBASE_PRIVATE_KEY_ID__/$FIREBASE_PRIVATE_KEY_ID/g" buildozer.spec
+          sed -i "s/__FIREBASE_PRIVATE_KEY__/$FIREBASE_PRIVATE_KEY/g" buildozer.spec
+          sed -i "s/__FIREBASE_CLIENT_EMAIL__/$FIREBASE_CLIENT_EMAIL/g" buildozer.spec
+          sed -i "s/__FIREBASE_CLIENT_ID__/$FIREBASE_CLIENT_ID/g" buildozer.spec
+          
+          # Escapar saltos de línea en la private key
+          sed -i 's/\\n/\\\\n/g' buildozer.spec
         env:
           FIREBASE_PRIVATE_KEY_ID: ${{ secrets.FIREBASE_PRIVATE_KEY_ID }}
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
+
+      - name: Build APK
+        run: |
+          buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
