@@ -5,10 +5,7 @@ on: [push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-       ANDROID_SDK_ROOT: /home/runner/android-sdk
-       ANDROID_NDK_HOME: /home/runner/android-sdk/ndk/25.2.9519653
-       
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,71 +15,60 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev libltdl-dev cython3
 
-      - name: Install Android SDK and ndk
+      - name: Install Android SDK and NDK
         run: |
-          # Crear directorios
+          # Descargar Android Command Line Tools
           mkdir -p ~/android-sdk
           cd ~/android-sdk
-          
-          # Descargar e instalar command line tools
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
           unzip -q commandlinetools-linux-9477386_latest.zip
           mv cmdline-tools latest
           mkdir -p cmdline-tools
           mv latest cmdline-tools/
           
-          # Configurar PATH
-          export PATH=$PATH:~/android-sdk/cmdline-tools/latest/bin:~/android-sdk/platform-tools:~/android-sdk/build-tools/33.0.0
+          # Configurar variables de entorno
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$HOME/android-sdk/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "PATH=$PATH:$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools" >> $GITHUB_ENV
           
           # Aceptar licencias
-          yes | sdkmanager --licenses > /dev/null 2>&1
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
           
-          # Instalar componentes ESSENCIALES
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+          # Instalar componentes Android
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0" "ndk;25.2.9519653"
           
-          # Instalar NDK ESPECÍFICO que necesita Buildozer
-          sdkmanager "ndk;25.2.9519653" --channel=3
-          
-          # Verificar instalación
-          echo "=== VERIFICACIÓN ANDROID ==="
-          ls -la ~/android-sdk/ndk/
-          ls -la ~/android-sdk/ndk/25.2.9519653/
-          echo "NDK path: $ANDROID_NDK_HOME"
+          # Verificar que Aidl está instalado
+          echo "=== VERIFICANDO AIDL ==="
+          find $HOME/android-sdk -name "aidl" -type f
+          $HOME/android-sdk/build-tools/33.0.0/aidl --version || echo "Aidl no ejecutable"
 
-      - name: Set up environment variables
-        run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-          echo "PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/build-tools/33.0.0" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Install Python dependencies
         run: |
           pip install buildozer cython
 
-      - name: Verify Android and NDK installation
+      - name: Create symbolic links for Android tools
         run: |
-          echo "=== VERIFICACIÓN COMPLETA ==="
-          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-          echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
-          echo "Java version:"
-          java -version
-          echo "Python version:"
-          python --version
-          echo "NDK contents:"
-          ls -la $ANDROID_NDK_HOME/ || echo "NDK no encontrado"
-          echo "Build tools:"
-          ls -la $ANDROID_SDK_ROOT/build-tools/33.0.0/ | head -10
+          # Crear enlaces simbólicos para que Buildozer encuentre las herramientas
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/aidl /usr/local/bin/aidl || true
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/aapt /usr/local/bin/aapt || true
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/zipalign /usr/local/bin/zipalign || true
+          sudo ln -sf $HOME/android-sdk/build-tools/33.0.0/d8 /usr/local/bin/d8 || true
+          
+          # Verificar enlaces
+          echo "=== ENLACES CREADOS ==="
+          ls -la /usr/local/bin/aidl || echo "No se pudo crear enlace para aidl"
+          which aidl || echo "Aidl no encontrado en PATH"
 
       - name: Create buildozer.spec from template
         run: |
@@ -125,26 +111,22 @@ jobs:
           FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
           FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_CLIENT_ID: ${{ secrets.FIREBASE_CLIENT_ID }}
-          
-      - name: Build APK with debug info
+
+      - name: Build APK
         run: |
-          echo "=== BUILD ENVIRONMENT ==="
+          echo "=== INFORMACIÓN DEL ENTORNO ==="
           echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-          echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
-          echo "PATH: $PATH"
+          echo "ANDROID_NDK_ROOT: $ANDROID_NDK_ROOT"
+          echo "Java version:"
+          java -version
+          echo "Python version:"
+          python --version
+          echo "Herramientas Android encontradas:"
+          which aidl || echo "Aidl no encontrado"
+          which aapt || echo "Aapt no encontrado"
+          which zipalign || echo "Zipalign no encontrado"
           
-          # Verificar que el NDK existe
-          if [ -d "$ANDROID_NDK_HOME" ]; then
-            echo "✅ NDK encontrado en: $ANDROID_NDK_HOME"
-            ls -la $ANDROID_NDK_HOME/
-          else
-            echo "❌ NDK NO encontrado en: $ANDROID_NDK_HOME"
-            echo "Buscando NDK en otras ubicaciones..."
-            find ~/android-sdk -name "ndk" -type d 2>/dev/null || echo "No se encontró NDK"
-            exit 1
-          fi
-          
-          # Ejecutar buildozer con verbose
+          # Ejecutar buildozer
           buildozer -v android debug
 
       - name: Upload APK
